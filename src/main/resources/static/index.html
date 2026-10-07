@@ -1,0 +1,1362 @@
+﻿<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FIDO 交易平台 | LND 閃電網路與後端效能對比測試中心</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0e17;
+            --bg-secondary: #121826;
+            --bg-card: #182234;
+            --bg-card-hover: #1f2c42;
+            --border-color: #27354d;
+            --accent-blue: #3b82f6;
+            --accent-cyan: #06b6d4;
+            --accent-lightning: #f59e0b;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --text-main: #f3f4f6;
+            --text-muted: #94a3b8;
+            --font-mono: 'JetBrains Mono', monospace;
+            --font-sans: 'Inter', system-ui, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-main);
+            font-family: var(--font-sans);
+            line-height: 1.5;
+            min-height: 100vh;
+        }
+
+        header {
+            background: linear-gradient(180deg, #151e30 0%, #0d131f 100%);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .brand-logo {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-lightning));
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 1.25rem;
+            color: #000;
+            box-shadow: 0 0 15px rgba(245, 158, 11, 0.4);
+        }
+
+        .brand-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            letter-spacing: -0.025em;
+        }
+
+        .brand-subtitle {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+        }
+
+        .header-stats {
+            display: flex;
+            gap: 1.5rem;
+            align-items: center;
+        }
+
+        .stat-chip {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.4rem 0.8rem;
+            display: flex;
+            flex-direction: column;
+            font-size: 0.75rem;
+        }
+
+        .stat-chip-label {
+            color: var(--text-muted);
+            font-size: 0.7rem;
+        }
+
+        .stat-chip-value {
+            font-family: var(--font-mono);
+            font-weight: 600;
+            color: var(--accent-cyan);
+        }
+
+        .main-container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 1.5rem;
+            display: grid;
+            grid-template-columns: 380px 1fr;
+            gap: 1.5rem;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .card-title {
+            font-size: 1rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* Form elements */
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        label {
+            display: block;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 0.35rem;
+            font-weight: 500;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.6rem 0.75rem;
+            color: var(--text-main);
+            font-size: 0.875rem;
+            font-family: inherit;
+            transition: border-color 0.15s ease;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.65rem 1.25rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            color: #fff;
+        }
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
+        }
+
+        .btn-lightning {
+            background: linear-gradient(135deg, #d97706, #b45309);
+            color: #fff;
+        }
+        .btn-lightning:hover {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            box-shadow: 0 0 12px rgba(245, 158, 11, 0.4);
+        }
+
+        .btn-dual {
+            background: linear-gradient(135deg, #059669, #047857);
+            color: #fff;
+            width: 100%;
+            margin-top: 0.5rem;
+        }
+        .btn-dual:hover {
+            background: linear-gradient(135deg, #10b981, #059669);
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+        }
+
+        .btn-sm {
+            padding: 0.35rem 0.65rem;
+            font-size: 0.75rem;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+        }
+        .btn-outline:hover {
+            background: var(--bg-card-hover);
+        }
+
+        /* Benchmark Result Visualizer */
+        .comparison-panel {
+            background: linear-gradient(180deg, #1e293b, #0f172a);
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin-bottom: 1.5rem;
+            display: none;
+        }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.25rem;
+            margin-top: 1rem;
+        }
+
+        .comparison-box {
+            background: rgba(15, 23, 42, 0.7);
+            border-radius: 10px;
+            padding: 1rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .comparison-box.standard {
+            border-left: 4px solid var(--accent-cyan);
+        }
+
+        .comparison-box.lightning {
+            border-left: 4px solid var(--accent-lightning);
+        }
+
+        .latency-badge {
+            display: inline-block;
+            font-family: var(--font-mono);
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin: 0.5rem 0;
+        }
+
+        .badge-standard {
+            color: var(--accent-cyan);
+        }
+
+        .badge-lightning {
+            color: var(--accent-lightning);
+        }
+
+        .latency-bar-wrap {
+            background: #334155;
+            height: 8px;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 0.5rem;
+        }
+
+        .latency-bar {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 1rem;
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            padding: 0.6rem 1rem;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.875rem;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tab-btn.active {
+            color: var(--accent-cyan);
+            border-bottom-color: var(--accent-cyan);
+        }
+
+        /* Table */
+        .table-responsive {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+
+        th {
+            background: var(--bg-secondary);
+            color: var(--text-muted);
+            font-weight: 600;
+            text-align: left;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border-color);
+            vertical-align: middle;
+        }
+
+        tr:hover td {
+            background: var(--bg-card-hover);
+        }
+
+        .uuid-tag {
+            font-family: var(--font-mono);
+            background: #1e293b;
+            color: #38bdf8;
+            padding: 0.2rem 0.45rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            border: 1px solid #334155;
+            cursor: pointer;
+            display: inline-block;
+        }
+
+        .tag-pill {
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+
+        .tag-standard {
+            background: rgba(6, 182, 212, 0.15);
+            color: #22d3ee;
+            border: 1px solid rgba(6, 182, 212, 0.3);
+        }
+
+        .tag-lnd {
+            background: rgba(245, 158, 11, 0.15);
+            color: #fbbf24;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        .tag-success {
+            background: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+        }
+
+        .tag-failed {
+            background: rgba(239, 68, 68, 0.15);
+            color: #f87171;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(4px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            padding: 1.5rem;
+        }
+
+        .modal-content {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            width: 100%;
+            max-width: 800px;
+            max-height: 85vh;
+            overflow-y: auto;
+            padding: 1.5rem;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .modal-close {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        pre {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.75rem;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            overflow-x: auto;
+            color: #93c5fd;
+            margin-bottom: 1rem;
+        }
+
+        .account-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .account-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .account-name {
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+
+        .account-balance {
+            font-family: var(--font-mono);
+            color: var(--accent-green);
+            font-size: 0.8rem;
+        }
+
+        .action-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="brand">
+        <div class="brand-logo">⚡</div>
+        <div>
+            <div class="brand-title">FIDO 交易平台</div>
+            <div class="brand-subtitle">JDK 25 | LND 閃電網路 API | RFC 9562 UUIDv7 16碼交易追蹤</div>
+        </div>
+    </div>
+    <div class="header-stats">
+        <div class="stat-chip">
+            <span class="stat-chip-label">LND 節點模式</span>
+            <span class="stat-chip-value" id="hdr-lnd-mode">連線中...</span>
+        </div>
+        <div class="stat-chip">
+            <span class="stat-chip-label">通道餘額</span>
+            <span class="stat-chip-value" id="hdr-channel-balance">- sats</span>
+        </div>
+        <div class="stat-chip">
+            <span class="stat-chip-label">活躍通道 / 區塊高度</span>
+            <span class="stat-chip-value" id="hdr-channels-peers">- / -</span>
+        </div>
+    </div>
+</header>
+
+<div class="main-container">
+
+    <!-- LEFT SIDEBAR: TRADE TRIGGER & ACCOUNT MANAGEMENT -->
+    <div>
+
+        <!-- Quick Trade Card -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">🚀 發起交易測試</div>
+            </div>
+
+            <div class="form-group">
+                <label>發送方 (Sender)</label>
+                <select id="trade-sender">
+                    <option value="user_a">Trader A (user_a)</option>
+                    <option value="user_b">Trader B (user_b)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>接收方 (Receiver)</label>
+                <select id="trade-receiver">
+                    <option value="user_b">Trader B (user_b)</option>
+                    <option value="user_a">Trader A (user_a)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>金額 (Amount / Satoshi)</label>
+                <input type="number" id="trade-amount" value="5000" min="1" step="1">
+            </div>
+
+            <div class="form-group">
+                <label>交易備註 (Memo)</label>
+                <input type="text" id="trade-memo" value="訂單結算測試">
+            </div>
+
+            <div class="action-row">
+                <button class="btn btn-primary" onclick="executeTrade('standard')">
+                    💾 一般後端交易
+                </button>
+                <button class="btn btn-lightning" onclick="executeTrade('lnd')">
+                    ⚡ 透過 LND 交易
+                </button>
+            </div>
+
+            <button class="btn btn-dual" onclick="executeBenchmark()">
+                ⚖️ 雙軌對比壓測 (Standard vs LND)
+            </button>
+        </div>
+
+        <!-- Account Management Card -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">👥 交易帳號管理</div>
+                <button class="btn btn-outline btn-sm" onclick="openNewUserModal()">+ 新增人員</button>
+            </div>
+            <div id="accounts-list">載入中...</div>
+        </div>
+
+        <!-- Role Application Card -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">🛡️ 角色權限申請 (申請管理者 / 使用者)</div>
+            </div>
+            <div class="form-group">
+                <label>申請帳號 (Applicant)</label>
+                <select id="apply-applicant"></select>
+            </div>
+            <div class="form-group">
+                <label>申請角色</label>
+                <select id="apply-role">
+                    <option value="ROLE_ADMIN">系統管理者 (ROLE_ADMIN)</option>
+                    <option value="ROLE_USER">一般使用者 (ROLE_USER)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>申請理由 / 業務說明</label>
+                <input type="text" id="apply-reason" placeholder="例如：需審核大額 LND 閃電通道清算作業">
+            </div>
+            <button class="btn btn-outline btn-sm" style="width:100%" onclick="submitRoleApplication()">
+                送出角色升級申請
+            </button>
+        </div>
+
+    </div>
+
+    <!-- RIGHT CONTENT: BENCHMARK VISUALIZER, TRANSACTION HISTORY, AUDIT LOGS -->
+    <div>
+
+        <!-- Side-by-Side Benchmark Visualizer -->
+        <div id="benchmark-panel" class="comparison-panel">
+            <div class="card-title" style="color: #38bdf8;">
+                📊 雙軌即時效能對比分析 (Standard DB vs LND Lightning)
+            </div>
+            <div id="benchmark-summary" style="margin-top: 0.5rem; font-size: 0.875rem; color: #cbd5e1;"></div>
+
+            <div class="comparison-grid">
+                <!-- Standard DB Card -->
+                <div class="comparison-box standard">
+                    <div style="font-weight: 600; color: var(--accent-cyan);">一般後端交易 (ACID DB)</div>
+                    <div class="latency-badge badge-standard" id="bench-std-time">0 ms</div>
+                    <div class="latency-bar-wrap">
+                        <div class="latency-bar" id="bench-std-bar" style="background: var(--accent-cyan); width: 0%;"></div>
+                    </div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem;">
+                        交易序號 (UUIDv7 16碼): <span class="uuid-tag" id="bench-std-uid">-</span><br>
+                        結算模式: 本地 PostgreSQL 樂觀/可重複讀事務<br>
+                        手續費: 0 sat
+                    </div>
+                </div>
+
+                <!-- LND Card -->
+                <div class="comparison-box lightning">
+                    <div style="font-weight: 600; color: var(--accent-lightning);">透過 LND 閃電網路交易</div>
+                    <div class="latency-badge badge-lightning" id="bench-lnd-time">0 ms</div>
+                    <div class="latency-bar-wrap">
+                        <div class="latency-bar" id="bench-lnd-bar" style="background: var(--accent-lightning); width: 0%;"></div>
+                    </div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem;">
+                        交易序號 (UUIDv7 16碼): <span class="uuid-tag" id="bench-lnd-uid">-</span><br>
+                        結算模式: BOLT11 發票簽發 + HTLC 多跳路由解鎖<br>
+                        網路手續費: <span id="bench-lnd-fee" style="color:var(--accent-lightning);">-</span> sats
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Tabbed Panel -->
+        <div class="card">
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchTab('tab-tx')">📋 即時交易紀錄與追蹤 (UUIDv7 16碼)</button>
+                <button class="tab-btn" onclick="switchTab('tab-stats')">📈 歷史統計與平均延遲比較</button>
+                <button class="tab-btn" onclick="switchTab('tab-review')">👑 總管理者審核專區 (<span id="pending-count">0</span>)</button>
+                <button class="tab-btn" onclick="switchTab('tab-audit')">🛡️ 資安稽核日誌 (Audit Trail)</button>
+            </div>
+
+            <!-- Tab 1: Transaction Records -->
+            <div id="tab-tx">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                    <div style="font-size: 0.8rem; color: var(--text-muted);">
+                        每筆交易均生成 RFC 9562 UUIDv7，去除「-」取前16碼作為唯一交易鍵，完整追蹤請求與響應。
+                    </div>
+                    <button class="btn btn-outline btn-sm" onclick="loadTransactions()">🔄 刷新列表</button>
+                </div>
+
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>交易序號 (UUIDv7 16碼)</th>
+                            <th>交易類型</th>
+                            <th>發送方</th>
+                            <th>接收方</th>
+                            <th>金額</th>
+                            <th>執行時間</th>
+                            <th>狀態</th>
+                            <th>時間</th>
+                            <th>請求/響應追蹤</th>
+                        </tr>
+                        </thead>
+                        <tbody id="tx-tbody">
+                        <tr><td colspan="9" style="text-align: center; color: var(--text-muted);">載入中...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tab 2: Historical Benchmark Stats -->
+            <div id="tab-stats" style="display: none;">
+                <div style="margin-bottom: 1rem; color: var(--text-muted); font-size: 0.85rem;">
+                    基於資料庫中所有成功交易進行的聚合對比（平均延遲、最小/最大耗時）。
+                </div>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>交易類型</th>
+                            <th>成功筆數</th>
+                            <th>平均延遲 (Avg Latency)</th>
+                            <th>最小延遲 (Min)</th>
+                            <th>最大延遲 (Max)</th>
+                            <th>網路特徵</th>
+                        </tr>
+                        </thead>
+                        <tbody id="stats-tbody">
+                        <tr><td colspan="6" style="text-align: center;">載入中...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tab 3: Super Admin Role Approval -->
+            <div id="tab-review" style="display: none;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:1rem; align-items:center;">
+                    <div style="font-size: 0.85rem; color: var(--text-muted);">
+                        總管理者專屬權限：審核一般使用者與管理者晉升申請。
+                    </div>
+                    <button class="btn btn-outline btn-sm" onclick="loadRoleApplications()">🔄 重新整理</button>
+                </div>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>申請單號</th>
+                            <th>申請人</th>
+                            <th>申請角色</th>
+                            <th>申請理由</th>
+                            <th>狀態</th>
+                            <th>申請時間</th>
+                            <th>總管理者審核操作</th>
+                        </tr>
+                        </thead>
+                        <tbody id="applications-tbody">
+                        <tr><td colspan="7" style="text-align: center;">載入中...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tab 4: Security Audit Logs -->
+            <div id="tab-audit" style="display: none;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:1rem; align-items:center;">
+                    <div style="font-size: 0.85rem; color: var(--text-muted);">
+                        資安合規紀錄：透過 AOP 攔截每個核心操作，記載操作者、客戶端 IP、HTTP 方法、耗時與狀態。
+                    </div>
+                    <button class="btn btn-outline btn-sm" onclick="loadAuditLogs()">🔄 重新整理</button>
+                </div>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>日誌 ID</th>
+                            <th>操作行為 (Action)</th>
+                            <th>操作者</th>
+                            <th>客戶端 IP</th>
+                            <th>端點 (Endpoint)</th>
+                            <th>耗時</th>
+                            <th>狀態</th>
+                            <th>時間</th>
+                        </tr>
+                        </thead>
+                        <tbody id="audit-tbody">
+                        <tr><td colspan="8" style="text-align: center;">載入中...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- MODAL: TX DETAILS DRAWER (Payload & Response Tracking) -->
+<div id="tx-modal" class="modal-overlay">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 style="display:flex; align-items:center; gap:0.5rem;">
+                🔍 交易深度追蹤檢視: <span id="modal-txuid" class="uuid-tag" style="font-size:1rem;"></span>
+            </h3>
+            <button class="modal-close" onclick="closeModal('tx-modal')">&times;</button>
+        </div>
+        <div>
+            <div style="margin-bottom: 0.75rem;">
+                <strong>完整 RFC 9562 UUIDv7:</strong>
+                <span id="modal-uuidfull" style="font-family: var(--font-mono); color: #38bdf8;"></span>
+            </div>
+            <div style="margin-bottom: 0.75rem; display:grid; grid-template-columns: 1fr 1fr; gap:0.5rem; font-size: 0.85rem;">
+                <div><strong>交易類型:</strong> <span id="modal-txtype"></span></div>
+                <div><strong>執行耗時:</strong> <span id="modal-latency" style="font-family:var(--font-mono); font-weight:700;"></span></div>
+                <div><strong>發送 / 接收:</strong> <span id="modal-parties"></span></div>
+                <div><strong>金額:</strong> <span id="modal-amount"></span></div>
+            </div>
+
+            <!-- LND Specific Info -->
+            <div id="modal-lnd-section" style="display:none; background:#1e293b; padding:0.75rem; border-radius:8px; margin-bottom:1rem; border:1px solid #334155;">
+                <div style="font-weight:600; color:var(--accent-lightning); margin-bottom:0.4rem;">⚡ LND 閃電網路加密證明</div>
+                <div style="font-size:0.75rem; word-break:break-all;">
+                    <strong>Payment Hash:</strong> <span id="modal-lnd-hash" style="color:#fde047;"></span><br>
+                    <strong>Payment Preimage:</strong> <span id="modal-lnd-preimage" style="color:#a7f3d0;"></span><br>
+                    <strong>多跳路由節點數 (Hops):</strong> <span id="modal-lnd-hops"></span> |
+                    <strong>路由手續費:</strong> <span id="modal-lnd-fee"></span> sats<br>
+                    <div style="margin-top:0.4rem;">
+                        <strong>BOLT11 發票請求碼:</strong><br>
+                        <textarea id="modal-lnd-invoice" readonly style="height:55px; font-size:0.7rem; font-family:var(--font-mono);"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <label>傳入 Request Payload (JSON 原始追蹤):</label>
+            <pre id="modal-request-payload">{}</pre>
+
+            <label>傳出 Response Payload (JSON 原始響應):</label>
+            <pre id="modal-response-payload">{}</pre>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: ADD USER -->
+<div id="new-user-modal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+            <h3>➕ 註冊新交易人員</h3>
+            <button class="modal-close" onclick="closeModal('new-user-modal')">&times;</button>
+        </div>
+        <div class="form-group">
+            <label>帳號 (Username)</label>
+            <input type="text" id="new-username" placeholder="trader_c">
+        </div>
+        <div class="form-group">
+            <label>電子郵件 (Email)</label>
+            <input type="email" id="new-email" placeholder="c@lightning.trading">
+        </div>
+        <div class="form-group">
+            <label>密碼 (Password)</label>
+            <input type="password" id="new-password" value="Trader#Pass2026!">
+        </div>
+        <div class="form-group">
+            <label>姓名 / 暱稱 (Full Name)</label>
+            <input type="text" id="new-fullname" placeholder="Trader Charlie">
+        </div>
+        <div class="form-group">
+            <label>角色 (Role)</label>
+            <select id="new-role">
+                <option value="ROLE_USER">一般交易員 (ROLE_USER)</option>
+                <option value="ROLE_ADMIN">系統管理者 (ROLE_ADMIN)</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>初始充值金額 (Initial Balance)</label>
+            <input type="number" id="new-balance" value="50000">
+        </div>
+        <button class="btn btn-primary" style="width: 100%;" onclick="createNewUser()">確認註冊</button>
+    </div>
+</div>
+
+<script>
+    const API_BASE = '/api';
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadNodeInfo();
+        loadAccounts();
+        loadTransactions();
+        loadRoleApplications();
+        loadAuditLogs();
+        loadBenchmarkStats();
+
+        // Auto refresh every 8 seconds
+        setInterval(() => {
+            loadNodeInfo();
+            loadAccounts();
+        }, 8000);
+    });
+
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        ['tab-tx', 'tab-stats', 'tab-review', 'tab-audit'].forEach(id => {
+            document.getElementById(id).style.display = (id === tabId) ? 'block' : 'none';
+        });
+        event.target.classList.add('active');
+
+        if (tabId === 'tab-stats') loadBenchmarkStats();
+        if (tabId === 'tab-review') loadRoleApplications();
+        if (tabId === 'tab-audit') loadAuditLogs();
+        if (tabId === 'tab-tx') loadTransactions();
+    }
+
+    // 1. Load LND Node Info
+    async function loadNodeInfo() {
+        try {
+            const res = await fetch(`${API_BASE}/trades/lnd-node`);
+            if (!res.ok) return;
+            const data = await res.json();
+            document.getElementById('hdr-lnd-mode').textContent = data.mode === 'MOCK_SIMULATOR' ? '模擬器 (Regtest Mock)' : '實體 LND 連線';
+            document.getElementById('hdr-channel-balance').textContent = Number(data.channelBalanceSat).toLocaleString() + ' sats';
+            document.getElementById('hdr-channels-peers').textContent = `${data.numActiveChannels} 通道 / 區塊 #${data.blockHeight}`;
+        } catch (e) {
+            console.error('Failed to load node info', e);
+        }
+    }
+
+    // 2. Load Accounts
+    async function loadAccounts() {
+        try {
+            const res = await fetch(`${API_BASE}/accounts`);
+            if (!res.ok) return;
+            const accounts = await res.json();
+
+            const listEl = document.getElementById('accounts-list');
+            const senderSelect = document.getElementById('trade-sender');
+            const receiverSelect = document.getElementById('trade-receiver');
+            const applySelect = document.getElementById('apply-applicant');
+
+            const currentSender = senderSelect.value;
+            const currentReceiver = receiverSelect.value;
+
+            listEl.innerHTML = '';
+            senderSelect.innerHTML = '';
+            receiverSelect.innerHTML = '';
+            applySelect.innerHTML = '';
+
+            accounts.forEach(acc => {
+                const roleColor = acc.role === 'ROLE_SUPER_ADMIN' ? '#f59e0b' : (acc.role === 'ROLE_ADMIN' ? '#38bdf8' : '#94a3b8');
+                const div = document.createElement('div');
+                div.className = 'account-card';
+                div.innerHTML = `
+                    <div class="account-info">
+                        <div class="account-name">${acc.fullName || acc.username} <span style="font-size:0.7rem; color:${roleColor}; font-weight:700;">[${acc.role}]</span></div>
+                        <div class="account-balance">💰 ${Number(acc.balance).toLocaleString()} sats/NTD</div>
+                    </div>
+                    <button class="btn btn-outline btn-sm" onclick="deposit('${acc.username}')">+ 充值</button>
+                `;
+                listEl.appendChild(div);
+
+                const opt1 = new Option(`${acc.username} (${acc.fullName || acc.role})`, acc.username);
+                const opt2 = new Option(`${acc.username} (${acc.fullName || acc.role})`, acc.username);
+                const opt3 = new Option(`${acc.username} (${acc.fullName || acc.role})`, acc.username);
+                senderSelect.appendChild(opt1);
+                receiverSelect.appendChild(opt2);
+                applySelect.appendChild(opt3);
+            });
+
+            if (currentSender) senderSelect.value = currentSender;
+            if (currentReceiver) receiverSelect.value = currentReceiver;
+            if (senderSelect.value === receiverSelect.value && senderSelect.options.length > 1) {
+                receiverSelect.selectedIndex = 1;
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    // 3. Deposit / Adjust Balance
+    async function deposit(username) {
+        const amount = prompt(`請輸入為 ${username} 充值的金額 (sats):`, "10000");
+        if (!amount || isNaN(amount)) return;
+        try {
+            const res = await fetch(`${API_BASE}/accounts/${username}/adjust-balance`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ delta: parseFloat(amount) })
+            });
+            if (res.ok) {
+                loadAccounts();
+            } else {
+                alert('充值失敗');
+            }
+        } catch (e) {
+            alert('充值錯誤: ' + e);
+        }
+    }
+
+    // 4. Execute Trade (Standard / LND)
+    async function executeTrade(type) {
+        const sender = document.getElementById('trade-sender').value;
+        const receiver = document.getElementById('trade-receiver').value;
+        const amount = parseFloat(document.getElementById('trade-amount').value);
+        const memo = document.getElementById('trade-memo').value;
+
+        if (sender === receiver) {
+            alert('發送方與接收方不可相同！');
+            return;
+        }
+
+        const endpoint = type === 'standard' ? `${API_BASE}/trades/standard` : `${API_BASE}/trades/lnd`;
+        const payload = type === 'standard' ? {
+            senderUsername: sender,
+            receiverUsername: receiver,
+            amount: amount,
+            memo: memo
+        } : {
+            senderUsername: sender,
+            receiverUsername: receiver,
+            amountSat: amount,
+            memo: memo
+        };
+
+        try {
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (res.ok) {
+                alert(`交易成功！\n唯一序號 (UUIDv7 16碼): ${data.txUid}\n耗時: ${data.executionTimeMs} ms`);
+                loadTransactions();
+                loadAccounts();
+                loadNodeInfo();
+                loadBenchmarkStats();
+            } else {
+                alert('交易失敗: ' + (data.message || JSON.stringify(data)));
+                loadTransactions();
+            }
+        } catch (e) {
+            alert('網路錯誤: ' + e);
+        }
+    }
+
+    // 5. Execute Benchmark Dual-Track
+    async function executeBenchmark() {
+        const sender = document.getElementById('trade-sender').value;
+        const receiver = document.getElementById('trade-receiver').value;
+        const amount = parseFloat(document.getElementById('trade-amount').value);
+        const memo = document.getElementById('trade-memo').value;
+
+        const panel = document.getElementById('benchmark-panel');
+        panel.style.display = 'block';
+        document.getElementById('benchmark-summary').textContent = '雙軌交易執行中，請稍候...';
+
+        try {
+            const res = await fetch(`${API_BASE}/trades/benchmark`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    senderUsername: sender,
+                    receiverUsername: receiver,
+                    amount: amount,
+                    memo: memo
+                })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                document.getElementById('benchmark-summary').textContent = data.analysisSummary;
+
+                // Standard
+                document.getElementById('bench-std-time').textContent = `${data.standardTrade.executionTimeMs} ms`;
+                document.getElementById('bench-std-uid').textContent = data.standardTrade.txUid;
+                document.getElementById('bench-std-bar').style.width = '20%';
+
+                // LND
+                document.getElementById('bench-lnd-time').textContent = `${data.lndTrade.executionTimeMs} ms`;
+                document.getElementById('bench-lnd-uid').textContent = data.lndTrade.txUid;
+                document.getElementById('bench-lnd-fee').textContent = data.lndTrade.lndFeeSat || 0;
+                document.getElementById('bench-lnd-bar').style.width = '80%';
+
+                loadTransactions();
+                loadAccounts();
+                loadNodeInfo();
+                loadBenchmarkStats();
+            } else {
+                alert('壓測失敗: ' + (data.message || JSON.stringify(data)));
+            }
+        } catch (e) {
+            alert('壓測出錯: ' + e);
+        }
+    }
+
+    // 6. Load Transactions
+    async function loadTransactions() {
+        try {
+            const res = await fetch(`${API_BASE}/trades/records?limit=50`);
+            if (!res.ok) return;
+            const records = await res.json();
+
+            const tbody = document.getElementById('tx-tbody');
+            if (records.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--text-muted);">尚無交易紀錄，請點擊上方按鈕發起交易</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = '';
+            records.forEach(r => {
+                const tr = document.createElement('tr');
+                const isLnd = r.txType === 'LND_LIGHTNING';
+                const isSuccess = r.status === 'SUCCESS';
+                const dateStr = new Date(r.createdAt).toLocaleTimeString();
+
+                tr.innerHTML = `
+                    <td><span class="uuid-tag" onclick="viewTxDetail('${r.txUid}')">${r.txUid}</span></td>
+                    <td><span class="tag-pill ${isLnd ? 'tag-lnd' : 'tag-standard'}">${isLnd ? '⚡ LND 閃電' : '💾 一般後端'}</span></td>
+                    <td><strong>${r.sender}</strong></td>
+                    <td><strong>${r.receiver}</strong></td>
+                    <td style="font-family:var(--font-mono); font-weight:600;">${Number(r.amount).toLocaleString()}</td>
+                    <td><span style="font-family:var(--font-mono); font-weight:700; color:${r.executionTimeMs > 50 ? 'var(--accent-lightning)' : 'var(--accent-green)'}">${r.executionTimeMs} ms</span></td>
+                    <td><span class="tag-pill ${isSuccess ? 'tag-success' : 'tag-failed'}">${r.status}</span></td>
+                    <td style="color:var(--text-muted); font-size:0.75rem;">${dateStr}</td>
+                    <td><button class="btn btn-outline btn-sm" onclick="viewTxDetail('${r.txUid}')">🔍 詳情與追蹤</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } catch (e) {
+            console.error('Failed to load transactions', e);
+        }
+    }
+
+    // 7. View Tx Detail Modal
+    async function viewTxDetail(txUid) {
+        try {
+            const res = await fetch(`${API_BASE}/trades/records/${txUid}`);
+            if (!res.ok) return;
+            const r = await res.json();
+
+            document.getElementById('modal-txuid').textContent = r.txUid;
+            document.getElementById('modal-uuidfull').textContent = r.uuidv7Full;
+            document.getElementById('modal-txtype').textContent = r.txType;
+            document.getElementById('modal-latency').textContent = `${r.executionTimeMs} ms`;
+            document.getElementById('modal-parties').textContent = `${r.sender} ➔ ${r.receiver}`;
+            document.getElementById('modal-amount').textContent = `${Number(r.amount).toLocaleString()} sats`;
+
+            const lndSec = document.getElementById('modal-lnd-section');
+            if (r.txType === 'LND_LIGHTNING' && r.lndPaymentHash) {
+                lndSec.style.display = 'block';
+                document.getElementById('modal-lnd-hash').textContent = r.lndPaymentHash;
+                document.getElementById('modal-lnd-preimage').textContent = r.lndPreimage || 'N/A';
+                document.getElementById('modal-lnd-hops').textContent = r.lndHopCount || '1';
+                document.getElementById('modal-lnd-fee').textContent = r.lndFeeSat || 0;
+                document.getElementById('modal-lnd-invoice').value = r.lndPaymentRequest || '';
+            } else {
+                lndSec.style.display = 'none';
+            }
+
+            document.getElementById('modal-request-payload').textContent = JSON.stringify({
+                txUid: r.txUid,
+                sender: r.sender,
+                receiver: r.receiver,
+                amount: r.amount,
+                memo: r.memo
+            }, null, 2);
+
+            document.getElementById('modal-response-payload').textContent = JSON.stringify(r, null, 2);
+
+            document.getElementById('tx-modal').style.display = 'flex';
+        } catch (e) {
+            alert('載入交易詳情失敗: ' + e);
+        }
+    }
+
+    // 8. Benchmark Stats
+    async function loadBenchmarkStats() {
+        try {
+            const res = await fetch(`${API_BASE}/trades/benchmark-stats`);
+            if (!res.ok) return;
+            const stats = await res.json();
+            const tbody = document.getElementById('stats-tbody');
+            if (stats.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">尚無足夠統計資料</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = '';
+            stats.forEach(s => {
+                const isLnd = s.txType === 'LND_LIGHTNING';
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><span class="tag-pill ${isLnd ? 'tag-lnd' : 'tag-standard'}">${isLnd ? '⚡ LND 閃電網路' : '💾 一般後端 ACID DB'}</span></td>
+                    <td style="font-family:var(--font-mono); font-weight:600;">${s.count} 筆</td>
+                    <td style="font-family:var(--font-mono); font-weight:700; color:${isLnd ? 'var(--accent-lightning)' : 'var(--accent-cyan)'};">${Number(s.avgLatency).toFixed(2)} ms</td>
+                    <td style="font-family:var(--font-mono);">${s.minLatency} ms</td>
+                    <td style="font-family:var(--font-mono);">${s.maxLatency} ms</td>
+                    <td style="color:var(--text-muted); font-size:0.8rem;">${isLnd ? '包含加密密鑰交換與 HTLC 路由多跳' : '本地 PostgreSQL WAL 序列寫入'}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } catch (e) {
+            console.error('Failed to load stats', e);
+        }
+    }
+
+    // 9. Role Applications & Super Admin Review
+    async function submitRoleApplication() {
+        const applicant = document.getElementById('apply-applicant').value;
+        const role = document.getElementById('apply-role').value;
+        const reason = document.getElementById('apply-reason').value;
+
+        if (!reason.trim()) {
+            alert('請填寫申請理由！');
+            return;
+        }
+
+        try {
+            const res = await fetch(`${API_BASE}/roles/apply`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    applicantUsername: applicant,
+                    requestedRole: role,
+                    reason: reason
+                })
+            });
+            if (res.ok) {
+                alert('申請已成功提交給總管理者！');
+                document.getElementById('apply-reason').value = '';
+                loadRoleApplications();
+            } else {
+                const err = await res.json();
+                alert('提交失敗: ' + err.message);
+            }
+        } catch (e) {
+            alert('錯誤: ' + e);
+        }
+    }
+
+    async function loadRoleApplications() {
+        try {
+            const res = await fetch(`${API_BASE}/roles/applications`);
+            if (!res.ok) return;
+            const apps = await res.json();
+
+            const tbody = document.getElementById('applications-tbody');
+            const pending = apps.filter(a => a.status === 'PENDING');
+            document.getElementById('pending-count').textContent = pending.length;
+
+            if (apps.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">尚無角色申請單</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = '';
+            apps.forEach(a => {
+                const tr = document.createElement('tr');
+                const isPending = a.status === 'PENDING';
+                tr.innerHTML = `
+                    <td style="font-family:var(--font-mono);">#${a.id}</td>
+                    <td><strong>${a.applicantUsername || 'N/A'}</strong></td>
+                    <td><span style="font-weight:700; color:#38bdf8;">${a.requestedRole}</span></td>
+                    <td style="max-width:250px; font-size:0.8rem;">${a.reason}</td>
+                    <td><span class="tag-pill ${isPending ? 'tag-lnd' : (a.status === 'APPROVED' ? 'tag-success' : 'tag-failed')}">${a.status}</span></td>
+                    <td style="font-size:0.75rem; color:var(--text-muted);">${new Date(a.createdAt).toLocaleString()}</td>
+                    <td>
+                        ${isPending ? `
+                            <button class="btn btn-primary btn-sm" onclick="reviewRole(${a.id}, 'APPROVED')">核准通過</button>
+                            <button class="btn btn-outline btn-sm" style="color:var(--accent-red);" onclick="reviewRole(${a.id}, 'REJECTED')">駁回</button>
+                        ` : `<span style="font-size:0.75rem; color:var(--text-muted);">已完成</span>`}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    async function reviewRole(appId, decision) {
+        const notes = prompt(`總管理者審核備註 (${decision}):`, decision === 'APPROVED' ? '審核通過，晉升權限' : '不符合資格');
+        try {
+            const res = await fetch(`${API_BASE}/roles/review`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    applicationId: appId,
+                    reviewerUsername: 'super_admin',
+                    decision: decision,
+                    reviewNotes: notes || ''
+                })
+            });
+            if (res.ok) {
+                alert(`審核完成: ${decision}`);
+                loadRoleApplications();
+                loadAccounts();
+            } else {
+                const err = await res.json();
+                alert('審核失敗: ' + err.message);
+            }
+        } catch (e) {
+            alert('錯誤: ' + e);
+        }
+    }
+
+    // 10. Audit Logs
+    async function loadAuditLogs() {
+        try {
+            const res = await fetch(`${API_BASE}/audit/logs?limit=50`);
+            if (!res.ok) return;
+            const logs = await res.json();
+
+            const tbody = document.getElementById('audit-tbody');
+            if (logs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align: center;">尚無稽核紀錄</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = '';
+            logs.forEach(l => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="font-family:var(--font-mono);">#${l.id}</td>
+                    <td><strong style="color:#60a5fa;">${l.action}</strong></td>
+                    <td>${l.operatorUsername || 'ANONYMOUS'}</td>
+                    <td style="font-family:var(--font-mono); font-size:0.75rem;">${l.clientIp}</td>
+                    <td style="font-size:0.75rem; color:var(--text-muted);">${l.endpoint}</td>
+                    <td style="font-family:var(--font-mono);">${l.executionTimeMs} ms</td>
+                    <td><span class="tag-pill ${l.status === 'SUCCESS' ? 'tag-success' : 'tag-failed'}">${l.status}</span></td>
+                    <td style="font-size:0.75rem; color:var(--text-muted);">${new Date(l.createdAt).toLocaleTimeString()}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    // 11. Create User
+    function openNewUserModal() {
+        document.getElementById('new-user-modal').style.display = 'flex';
+    }
+
+    async function createNewUser() {
+        const username = document.getElementById('new-username').value.trim();
+        const email = document.getElementById('new-email').value.trim();
+        const password = document.getElementById('new-password').value;
+        const fullName = document.getElementById('new-fullname').value.trim();
+        const role = document.getElementById('new-role').value;
+        const initialBalance = parseFloat(document.getElementById('new-balance').value);
+
+        if (!username || !email || !password) {
+            alert('請填寫完整帳號、Email 與密碼！');
+            return;
+        }
+
+        try {
+            const res = await fetch(`${API_BASE}/accounts`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username,
+                    email,
+                    password,
+                    fullName,
+                    role,
+                    initialBalance
+                })
+            });
+            if (res.ok) {
+                alert(`帳號 ${username} 建立成功！`);
+                closeModal('new-user-modal');
+                loadAccounts();
+            } else {
+                const err = await res.json();
+                alert('建立失敗: ' + (err.message || JSON.stringify(err)));
+            }
+        } catch (e) {
+            alert('錯誤: ' + e);
+        }
+    }
+
+    function closeModal(id) {
+        document.getElementById(id).style.display = 'none';
+    }
+
+    window.onclick = function(event) {
+        if (event.target.classList.contains('modal-overlay')) {
+            event.target.style.display = 'none';
+        }
+    };
+</script>
+</body>
+</html>
